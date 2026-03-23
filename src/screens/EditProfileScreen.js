@@ -13,6 +13,7 @@ import {
   View,
   findNodeHandle,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { GREEN, NEUTRAL } from '../theme/colors';
@@ -41,6 +42,7 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, onFocus,
 }
 
 export default function EditProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { me, isBusy, updateProfile } = useAuth();
   const [scrollRef, setScrollRef] = useState(null);
 
@@ -145,7 +147,7 @@ export default function EditProfileScreen({ navigation }) {
 
       <View style={styles.top}>
         <View style={styles.topBgBubble} />
-        <View style={styles.topInner}>
+        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
           <View style={styles.topRow}>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
               <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -288,7 +290,7 @@ const styles = StyleSheet.create({
     top: -120,
     left: -90,
   },
-  topInner: { flex: 1, paddingTop: 56, paddingHorizontal: 20 },
+  topInner: { flex: 1, paddingHorizontal: 20 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: {
     width: 44,

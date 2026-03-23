@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import BottomNav from '../components/BottomNav';
@@ -14,12 +15,13 @@ const ITEMS = [
 ];
 
 export default function DuaScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
       {/* Green hero on top */}
-      <View style={styles.top}>
+      <View style={[styles.top, { height: Math.max(118, Math.max(insets.top, 8) + 72) }]}>
         <View style={styles.topBgBubble} />
-        <View style={styles.topInner}>
+        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 8) + 6 }]}>
           <View style={styles.headerRow}>
             <Text style={styles.headerTitle}>Dua</Text>
             <TouchableOpacity activeOpacity={0.7} style={styles.headerIconBtn}>
@@ -57,7 +59,7 @@ const styles = StyleSheet.create({
   // Green background like dashboard; white only below hero
   screen: { flex: 1, backgroundColor: GREEN.bg },
   top: {
-    height: 140,
+    minHeight: 118,
     backgroundColor: GREEN.dark,
     overflow: 'hidden',
     borderBottomLeftRadius: 28,
@@ -72,7 +74,7 @@ const styles = StyleSheet.create({
     top: -120,
     left: -60,
   },
-  topInner: { flex: 1, paddingTop: 54, paddingHorizontal: 20 },
+  topInner: { flex: 1, paddingHorizontal: 20 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

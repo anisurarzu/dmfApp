@@ -1,7 +1,8 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Image, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { GREEN } from '../theme/colors';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -12,17 +13,36 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import PrayerScreen from '../screens/PrayerScreen';
 import DuaScreen from '../screens/DuaScreen';
-import { GREEN } from '../theme/colors';
-
+import QuizListScreen from '../screens/QuizListScreen';
+import QuizPrepScreen from '../screens/QuizPrepScreen';
+import QuizPlayScreen from '../screens/QuizPlayScreen';
+import QuizLeaderboardScreen from '../screens/QuizLeaderboardScreen';
 const Stack = createNativeStackNavigator();
 
 function BootScreen() {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color={GREEN.main} />
+    <View style={bootStyles.root}>
+      <Image
+        source={require('../../assets/dmf-loading-icon.png')}
+        style={bootStyles.logo}
+        resizeMode="contain"
+        accessibilityLabel="Dar Al Muttaqin"
+      />
+      <ActivityIndicator size="large" color={GREEN.main} style={bootStyles.spinner} />
     </View>
   );
 }
+
+const bootStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  logo: { width: 160, height: 160 },
+  spinner: { marginTop: 24 },
+});
 
 export default function AppNavigator() {
   const { token, isBooting } = useAuth();
@@ -41,6 +61,10 @@ export default function AppNavigator() {
           <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           <Stack.Screen name="Prayer" component={PrayerScreen} />
           <Stack.Screen name="Dua" component={DuaScreen} />
+          <Stack.Screen name="QuizList" component={QuizListScreen} />
+          <Stack.Screen name="QuizPrep" component={QuizPrepScreen} />
+          <Stack.Screen name="QuizPlay" component={QuizPlayScreen} />
+          <Stack.Screen name="QuizLeaderboard" component={QuizLeaderboardScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>

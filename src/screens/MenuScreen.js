@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
@@ -54,13 +55,14 @@ function MenuRow({ icon, label, sub, onPress }) {
 }
 
 export default function MenuScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { logout, isBusy } = useAuth();
 
   return (
     <View style={styles.screen}>
       <StatusBar style="dark" />
 
-      <View style={styles.top}>
+      <View style={[styles.top, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
         <View style={styles.topRow}>
           <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color={GREEN.dark} />
@@ -105,7 +107,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#ffffff' },
   top: {
     backgroundColor: '#ffffff',
-    paddingTop: 56,
     paddingHorizontal: 20,
     paddingBottom: 12,
   },

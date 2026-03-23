@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
@@ -54,6 +55,7 @@ function Row({ icon, title, subtitle, onPress }) {
 }
 
 export default function ProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { me, logout, isBusy } = useAuth();
   const avatarUri = getAvatarUri(me);
   const initials = getInitials(me);
@@ -68,7 +70,7 @@ export default function ProfileScreen({ navigation }) {
 
       <View style={styles.top}>
         <View style={styles.topBgBubble} />
-        <View style={styles.topInner}>
+        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
           <View style={styles.topRow}>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.navigate('Menu')}>
               <Ionicons name="menu" size={22} color="#fff" />
@@ -123,7 +125,7 @@ const styles = StyleSheet.create({
     top: -140,
     right: -110,
   },
-  topInner: { flex: 1, paddingTop: 56, paddingHorizontal: 20 },
+  topInner: { flex: 1, paddingHorizontal: 20 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: {
     width: 44,

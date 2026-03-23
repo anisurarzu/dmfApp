@@ -12,12 +12,14 @@ import {
   View,
   findNodeHandle,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
 
 export default function ChangePasswordScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { me, isBusy, changePassword } = useAuth();
   const email = useMemo(() => (me?.email ? String(me.email).trim().toLowerCase() : ''), [me]);
 
@@ -78,7 +80,7 @@ export default function ChangePasswordScreen({ navigation }) {
 
       <View style={styles.top}>
         <View style={styles.topBgBubble} />
-        <View style={styles.topInner}>
+        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
           <View style={styles.topRow}>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
               <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
     top: -120,
     right: -90,
   },
-  topInner: { flex: 1, paddingTop: 56, paddingHorizontal: 20 },
+  topInner: { flex: 1, paddingHorizontal: 20 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: {
     width: 44,

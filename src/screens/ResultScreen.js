@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiSearchResult } from '../api/result';
 import { GREEN, NEUTRAL } from '../theme/colors';
@@ -63,6 +64,7 @@ function toShareText(doc) {
 }
 
 export default function ResultScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [roll, setRoll] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState('');
@@ -115,7 +117,7 @@ export default function ResultScreen({ navigation }) {
 
       <View style={styles.top}>
         <View style={styles.topBgBubble} />
-        <View style={styles.topInner}>
+        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
           <View style={styles.topRow}>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
               <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -260,7 +262,7 @@ const styles = StyleSheet.create({
     top: -120,
     right: -90,
   },
-  topInner: { flex: 1, paddingTop: 56, paddingHorizontal: 20 },
+  topInner: { flex: 1, paddingHorizontal: 20 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: {
     width: 44,
