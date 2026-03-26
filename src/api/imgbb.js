@@ -8,14 +8,15 @@ function guessMimeType(uri) {
   return 'image/jpeg';
 }
 
-export async function uploadToImgbb({ uri }) {
+export async function uploadToImgbb({ uri, mimeType } = {}) {
   if (!uri) throw new Error('Image uri is required');
 
+  const type = mimeType || guessMimeType(uri);
   const formData = new FormData();
   formData.append('image', {
     uri,
     name: `profile_${Date.now()}.jpg`,
-    type: guessMimeType(uri),
+    type,
   });
 
   const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {

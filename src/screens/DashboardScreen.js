@@ -1,9 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
+  Easing,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,13 +15,18 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GREEN } from '../theme/colors';
+import { GREEN, NEUTRAL } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
+import { EDUCATION_ITEMS } from '../constants/educationItems';
 
 const NOTIFICATIONS_STORAGE_KEY = 'dmf_dashboard_notifications_v1';
+
+/** Set true to show the hadith marquee in the dashboard header again. */
+const SHOW_DASHBOARD_HADITH = false;
 
 const DEFAULT_NOTIFICATIONS = [
   {
@@ -48,14 +56,277 @@ const DEFAULT_NOTIFICATIONS = [
 ];
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const EDU_CARD_WIDTH = (SCREEN_WIDTH - 40 - 12) / 2; // 40 = sheet horizontal padding, 12 = gap between cards
+
+/** Dashboard header + accent tokens (green, matches app theme). */
+const HEADER = {
+  grad: ['#052e16', '#0c3d26', '#136c3a', '#16a34a', '#22a85c'],
+  gradLoc: [0, 0.22, 0.48, 0.72, 1],
+  accent: GREEN.main,
+  iconPlate: 'rgba(22, 163, 74, 0.16)',
+  iconBorder: GREEN.main,
+  label: GREEN.dark,
+  dark: GREEN.dark,
+};
+
+const SHEET_PAD_X = 20;
+const PAYMENT_GRID_GAP = 12;
+const PAYMENT_TILE_W = (SCREEN_WIDTH - SHEET_PAD_X * 2 - PAYMENT_GRID_GAP * 3) / 4;
+const EDU_GRID_GAP = 8;
+const EDU_TILE_W = (SCREEN_WIDTH - SHEET_PAD_X * 2 - EDU_GRID_GAP * 2) / 3;
+/** Education tiles: larger squircle than payment grid (payment caps at 72). */
+const EDU_SQUIRCLE = Math.min(EDU_TILE_W - 4, 84);
+const PROMO_CARD_SCROLL_W = SCREEN_WIDTH - SHEET_PAD_X * 2 - 36;
+
+const PAYMENT_LIST_ITEMS = [
+  { key: 'courses', label: 'Courses', icon: 'school-outline', color: '#15803d', route: 'EducationAll' },
+  { key: 'books', label: 'Books', icon: 'book-outline', color: '#ca8a04', route: 'EducationAll' },
+  { key: 'skills', label: 'Skills', icon: 'ribbon-outline', color: '#db2777', route: 'EducationAll' },
+  { key: 'exam', label: 'Exam Fee', icon: 'document-text-outline', color: '#1d4ed8', route: 'EducationAll' },
+  { key: 'training', label: 'Training', icon: 'fitness-outline', color: '#0369a1', route: 'EducationAll' },
+  { key: 'rewards', label: 'Rewards Shop', icon: 'gift-outline', color: GREEN.main, route: 'EducationAll' },
+  { key: 'goalsaving', label: 'Goal Saving', icon: 'flag-outline', color: '#0d9488', route: 'EducationAll' },
+  { key: 'career', label: 'Career', icon: 'briefcase-outline', color: '#64748b', route: 'EducationAll' },
+];
+
+const OTHERS_LIST_ITEMS = [
+  {
+    key: 'gift_voucher',
+    label: 'Gift Voucher',
+    icon: 'gift-outline',
+    color: '#db2777',
+    route: 'EducationAll',
+    badge: 'Popular',
+  },
+  {
+    key: 'shop_voucher',
+    label: 'Shop Voucher',
+    icon: 'bag-handle-outline',
+    color: '#ca8a04',
+    route: 'EducationAll',
+    badge: 'New',
+  },
+  { key: 'donate', label: 'Donate', icon: 'heart-outline', color: '#ef4444', route: 'EducationAll' },
+  { key: 'blood_donate', label: 'Blood Donate', icon: 'water-outline', color: '#dc2626', route: 'BloodDonation' },
+  { key: 'career_other', label: 'Career', icon: 'briefcase-outline', color: '#64748b', route: 'EducationAll' },
+  { key: 'student_loan', label: 'Student Loan', icon: 'cash-outline', color: '#15803d', route: 'EducationAll' },
+  { key: 'scholarship_info', label: 'Scholarship Info', icon: 'document-text-outline', color: '#1d4ed8', route: 'EducationAll' },
+  { key: 'support', label: 'Support', icon: 'chatbubbles-outline', color: GREEN.main, route: 'Menu' },
+];
+
+function educationItemRoute(key) {
+  switch (key) {
+    case 'quiz':
+      return 'QuizList';
+    case 'result':
+      return 'Results';
+    case 'courses':
+      return 'Menu';
+    case 'blood_donation':
+      return 'BloodDonation';
+    default:
+      return 'EducationAll';
+  }
+}
+
+function renderShortcutIcon(type) {
+  switch (type) {
+    case 'topup':
+      return (
+        <View style={styles.actionGlowPlate}>
+          <View style={styles.walletIconWrap}>
+            <Ionicons name="wallet-outline" size={19} color={HEADER.dark} />
+            <View style={styles.walletPlusBadge}>
+              <Ionicons name="add" size={9} color="#fff" />
+            </View>
+          </View>
+        </View>
+      );
+    case 'send':
+      return (
+        <View style={styles.actionGlowPlate}>
+          <View style={styles.dollarCircle}>
+            <Text style={styles.dollarCircleChar}>$</Text>
+            <Ionicons name="arrow-up-outline" size={10} color={HEADER.dark} style={styles.dollarCircleArrowSend} />
+          </View>
+        </View>
+      );
+    case 'request':
+      return (
+        <View style={styles.actionGlowPlate}>
+          <View style={styles.dollarCircle}>
+            <Text style={styles.dollarCircleChar}>$</Text>
+            <Ionicons name="arrow-down-outline" size={10} color={HEADER.dark} style={styles.dollarCircleArrowReq} />
+          </View>
+        </View>
+      );
+    case 'history':
+      return (
+        <View style={styles.actionGlowPlate}>
+          <View style={styles.historyTenWrap}>
+            <Ionicons name="time-outline" size={26} color={HEADER.dark} />
+            <View style={styles.historyTenOverlay} pointerEvents="none">
+              <Text style={styles.historyTenCenter}>10</Text>
+            </View>
+          </View>
+        </View>
+      );
+    default:
+      return null;
+  }
+}
+
+/**
+ * One hadith per weekday (0 = Sunday … 6 = Saturday).
+ * `hadithNo`: বাংলা সংখ্যায় — কিতাবভেদে হাদিস নম্বর সামান্য ভিন্ন হতে পারে।
+ */
+const DAILY_HADITH_BN = [
+  {
+    body: 'কেবলমাত্র নিয়ত অনুযায়ী প্রত্যেকের জন্য সে যা নিয়ত করে।',
+    hadithNo: '১',
+    ref: 'সহীহ বুখারী ও মুসলিম',
+  },
+  {
+    body: 'তোমাদের মধ্যে শ্রেষ্ঠ সেই ব্যক্তি, যে কুরআন শিখে এবং অন্যকে শেখায়।',
+    hadithNo: '৫০২৭',
+    ref: 'সহীহ বুখারী',
+  },
+  {
+    body: 'মুসলমান সে, যার হাত ও জিভ থেকে অন্য মুসলমান নিরাপদ থাকে।',
+    hadithNo: '১০',
+    ref: 'সহীহ বুখারী',
+  },
+  {
+    body: 'পবিত্রতা ঈমানের অর্ধেক।',
+    hadithNo: '২২৩',
+    ref: 'সহীহ মুসলিম',
+  },
+  {
+    body: 'তোমাদের কেউ পথের কষ্টকর বস্তু সরিয়ে দিলে সে সদকা পেল।',
+    hadithNo: '২৬২৮',
+    ref: 'সহীহ মুসলিম',
+  },
+  {
+    body: 'তোমাদের মধ্যে কেউ সহীহভাবে সূরা ইখলাস তিলাওয়াত করলে কুরআনের এক-তৃতীয়াংশ পাঠ করার সওয়াব পায়।',
+    hadithNo: '৬৬৬৮',
+    ref: 'সহীহ বুখারী',
+  },
+  {
+    body: 'জান্নাত মায়ের কদমের নিচে রাখা হয়েছে।',
+    hadithNo: '৩১০৪',
+    ref: 'সুনান নাসাঈ, সহীহ ইবনে হিব্বান',
+  },
+];
+
+function hadithForToday() {
+  const d = new Date().getDay();
+  return DAILY_HADITH_BN[d % DAILY_HADITH_BN.length];
+}
+
+function hadithCitation(ref, hadithNo) {
+  const r = ref != null && String(ref).trim() !== '' ? String(ref).trim() : '—';
+  const n = hadithNo != null && String(hadithNo).trim() !== '' ? String(hadithNo).trim() : '';
+  return n ? `${r} (${n})` : r;
+}
+
+function hadithAccessibilityLabel(body, hadithNo, ref) {
+  return `${body} -- ${hadithCitation(ref, hadithNo)}`;
+}
+
+/**
+ * Row of Text nodes — avoid nested Text + parent numberOfLines={1} (RN often clips after first child).
+ */
+function HadithMarqueeLine({ body, hadithNo, refText, textStyle, onLayout, hideFromA11y }) {
+  const citation = hadithCitation(refText, hadithNo);
+  return (
+    <View
+      style={styles.hadithMarqueeLineRow}
+      onLayout={onLayout}
+      collapsable={false}
+      {...(hideFromA11y
+        ? { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' }
+        : {})}
+    >
+      <Text style={[textStyle, styles.hadithMarqueeBodySeg]} numberOfLines={1} ellipsizeMode="clip">
+        {body}
+      </Text>
+      <Text style={[textStyle, styles.hadithMarqueeSep]} numberOfLines={1}>
+        {' -- '}
+      </Text>
+      <Text style={[textStyle, styles.hadithMarqueeRef]} numberOfLines={1} ellipsizeMode="clip">
+        {citation}
+      </Text>
+    </View>
+  );
+}
+
+function HadithMarquee({ body, hadithNo, refText, textStyle }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [textW, setTextW] = useState(0);
+  const [containerW, setContainerW] = useState(0);
+  const gap = 96;
+  const a11yLabel = hadithAccessibilityLabel(body, hadithNo, refText);
+
+  useEffect(() => {
+    if (textW <= 0 || containerW <= 0) return undefined;
+    translateX.stopAnimation();
+    const segment = textW + gap;
+    translateX.setValue(0);
+    const pxPerSec = 22;
+    const duration = Math.max(18000, (segment / pxPerSec) * 1000);
+    const loop = Animated.loop(
+      Animated.timing(translateX, {
+        toValue: -segment,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [body, hadithNo, refText, textW, containerW, gap, translateX]);
+
+  return (
+    <View style={styles.hadithMarqueeBlock}>
+      <View style={styles.hadithMeasureWrap} pointerEvents="none">
+        <HadithMarqueeLine
+          body={body}
+          hadithNo={hadithNo}
+          refText={refText}
+          textStyle={textStyle}
+          hideFromA11y
+          onLayout={(e) => setTextW(e.nativeEvent.layout.width)}
+        />
+      </View>
+      <View
+        style={styles.hadithMarqueeClip}
+        onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+        accessible
+        accessibilityLabel={a11yLabel}
+        accessibilityRole="text"
+      >
+        {textW > 0 && containerW > 0 ? (
+          <Animated.View style={[styles.hadithMarqueeRow, { transform: [{ translateX }] }]}>
+            <HadithMarqueeLine body={body} hadithNo={hadithNo} refText={refText} textStyle={textStyle} />
+            <View style={{ width: gap }} />
+            <HadithMarqueeLine body={body} hadithNo={hadithNo} refText={refText} textStyle={textStyle} />
+            <View style={{ width: gap }} />
+            <HadithMarqueeLine body={body} hadithNo={hadithNo} refText={refText} textStyle={textStyle} />
+          </Animated.View>
+        ) : (
+          <View style={styles.hadithMarqueePlaceholder} />
+        )}
+      </View>
+    </View>
+  );
+}
 
 export default function DashboardScreen({ navigation }) {
-  const { me, logout, isBusy } = useAuth();
+  const { me } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATIONS);
+  const [headerHeight, setHeaderHeight] = useState(272);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,23 +405,44 @@ export default function DashboardScreen({ navigation }) {
       .map((s) => s[0]?.toUpperCase())
       .join('') || 'U';
 
+  const hadithToday = hadithForToday();
+
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
 
-      <View style={styles.top}>
-        <View style={styles.topBgBubble} />
-        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
-          <View style={styles.topRow}>
-            <TouchableOpacity
-              style={[styles.iconBtn, styles.menuBtn]}
-              activeOpacity={0.75}
-              onPress={() => navigation.navigate('Menu')}
-            >
-              <Ionicons name="menu" size={22} color="#fff" />
-            </TouchableOpacity>
+      <LinearGradient
+        colors={HEADER.grad}
+        locations={HEADER.gradLoc}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.top}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+      >
+        <View style={[styles.topInner, { paddingTop: Math.max(insets.top, 10) + 4 }]}>
+          {SHOW_DASHBOARD_HADITH && (
+            <HadithMarquee
+              body={hadithToday.body}
+              hadithNo={hadithToday.hadithNo}
+              refText={hadithToday.ref}
+              textStyle={styles.hadithMarqueeText}
+            />
+          )}
 
-            <View style={styles.topRight}>
+          <View style={styles.topRow}>
+            <View style={styles.topRowLeft}>
+              <TouchableOpacity style={styles.avatarBtn} activeOpacity={0.8} onPress={() => navigation.navigate('Profile')}>
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarInitials}>{initials}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.topRowRight}>
               <TouchableOpacity
                 style={[styles.iconBtn, styles.notifBtn]}
                 activeOpacity={0.75}
@@ -164,40 +456,26 @@ export default function DashboardScreen({ navigation }) {
                   </View>
                 )}
               </TouchableOpacity>
-
-              <TouchableOpacity style={styles.avatarBtn} activeOpacity={0.8} onPress={() => navigation.navigate('Profile')}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarInitials}>{initials}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
             </View>
           </View>
 
-          <Text style={styles.topTitle}>Support education. Change lives.</Text>
-          <Text style={styles.topSubtitle}>
-            Welcome{me?.firstName ? `, ${me.firstName}` : ''} — explore scholarships, results, and ways to help.
-          </Text>
-
-          <View style={styles.pillRow}>
-            <TouchableOpacity style={styles.pill} activeOpacity={0.85}>
-              <Ionicons name="sparkles-outline" size={18} color="#eafff0" />
-              <Text style={styles.pillText}>Quick actions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.logoutMini}
-              activeOpacity={0.85}
-              onPress={logout}
-              disabled={isBusy}
-            >
-              <Ionicons name="log-out-outline" size={18} color="#fff" />
-            </TouchableOpacity>
+          <View style={styles.balanceInHeader}>
+            <Text style={styles.availableBalanceLabel}>Scholarship Wallet</Text>
+            <Text style={styles.walletSubLabel}>Your Learning Fund</Text>
+            <Text style={styles.availableBalanceAmount} numberOfLines={1}>
+              ৳137,946
+            </Text>
+            <View style={styles.balanceStatsRow}>
+              <Text style={styles.balanceStatText}>Saved: ৳12,400</Text>
+              <Text style={styles.balanceStatDivider}>·</Text>
+              <Text style={styles.balanceStatText}>Bonus: ৳800</Text>
+              <Text style={styles.balanceStatDivider}>·</Text>
+              <Text style={styles.balanceStatText}>Locked: ৳5,000</Text>
+            </View>
+            <Text style={styles.streakHint}>🔥 Streak: 5 days no withdraw</Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scroll}
@@ -205,123 +483,162 @@ export default function DashboardScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.sheet}>
-          <View style={styles.section}>
-            <View style={styles.eduWrap}>
-              <View style={[styles.sectionHead, styles.eduHead]}>
-                <Text style={styles.sectionTitle}>Education</Text>
-                <TouchableOpacity activeOpacity={0.7}>
-                  <Text style={styles.viewAll}>View All</Text>
+          <View style={[styles.section, styles.paymentSection]}>
+            <Text style={styles.paymentListTitle}>Use Your Wallet</Text>
+            <View style={styles.paymentListGrid}>
+              {PAYMENT_LIST_ITEMS.map((item, index) => (
+                <TouchableOpacity
+                  key={item.key}
+                  activeOpacity={0.88}
+                  style={[
+                    styles.paymentListTile,
+                    ((index + 1) % 4 === 0 || index === PAYMENT_LIST_ITEMS.length - 1) &&
+                      styles.paymentListTileRowEnd,
+                  ]}
+                  onPress={() => navigation.navigate(item.route)}
+                >
+                  <View style={styles.paymentListSquircle}>
+                    <Ionicons name={item.icon} size={26} color={item.color} />
+                  </View>
+                  <Text style={styles.paymentListLabel} numberOfLines={2}>
+                    {item.label}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.eduScroll}
-              >
-                {[
-                  { key: 'scholarship', title: 'Scholarships', sub: 'Apply & track', icon: 'school' },
-                  { key: 'quiz', title: 'Practice', sub: 'Quiz & MCQ', icon: 'help-circle' },
-                  { key: 'result', title: 'Results', sub: 'Merit list', icon: 'trophy' },
-                  { key: 'library', title: 'Resources', sub: 'Notes & guides', icon: 'book' },
-                ].map((item, index, arr) => (
-                  <TouchableOpacity
-                    key={item.key}
-                    style={[
-                      styles.eduCardH,
-                      index === arr.length - 1 && { marginRight: 0 },
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      if (item.key === 'result') navigation.navigate('Results');
-                      if (item.key === 'quiz') navigation.navigate('QuizList');
-                    }}
-                  >
-                    {item.key === 'scholarship' ? (
-                      <View style={styles.eduImgH}>
-                        <Image
-                          source={require('../../assets/logo-dmf-scholarship.png')}
-                          style={styles.eduImgLogo}
-                          resizeMode="contain"
-                        />
-                      </View>
-                    ) : item.key === 'quiz' ? (
-                      <View style={styles.eduImgH}>
-                        <Image
-                          source={require('../../assets/quize-icon.png')}
-                          style={styles.eduImgLogo}
-                          resizeMode="contain"
-                        />
-                      </View>
-                    ) : item.key === 'result' ? (
-                      <View style={styles.eduImgH}>
-                        <Image
-                          source={require('../../assets/result.png')}
-                          style={styles.eduImgLogo}
-                          resizeMode="contain"
-                        />
-                      </View>
-                    ) : item.key === 'library' ? (
-                      <View style={styles.eduImgH}>
-                        <Image
-                          source={require('../../assets/learning.png')}
-                          style={styles.eduImgLogo}
-                          resizeMode="contain"
-                        />
-                      </View>
-                    ) : (
-                      <View style={styles.eduImgH} />
-                    )}
-                    <View style={styles.popMeta}>
-                      <View style={styles.popIcon}>
-                        <Ionicons name={item.icon} size={16} color={GREEN.dark} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.popTitle}>{item.title}</Text>
-                        <Text style={styles.popSub}>{item.sub}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              ))}
             </View>
           </View>
 
           <View style={styles.section}>
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Charity</Text>
-              <TouchableOpacity activeOpacity={0.7}>
-                <Text style={styles.viewAll}>View All</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.popGrid}>
-              {[
-                { key: 'donation', title: 'Donate', sub: 'Zakat • Sadaqah • Fund', icon: 'heart' },
-                { key: 'programs', title: 'Campaigns', sub: 'Urgent needs', icon: 'megaphone' },
-              ].map((item) => (
-                <TouchableOpacity key={item.key} style={styles.popCard} activeOpacity={0.85}>
-                  <View style={styles.popImg}>
-                    {item.key === 'donation' && (
-                      <Image
-                        source={require('../../assets/donation.png')}
-                        style={styles.popImgAsset}
-                        resizeMode="contain"
+            <Text style={styles.paymentListTitle}>Education</Text>
+            <View style={styles.eduGrid}>
+              {EDUCATION_ITEMS.map((item, index) => (
+                <TouchableOpacity
+                  key={item.key}
+                  activeOpacity={0.88}
+                  style={[styles.eduTile, (index + 1) % 3 === 0 && styles.eduTileRowEnd]}
+                  onPress={() => navigation.navigate(educationItemRoute(item.key))}
+                >
+                  <View style={styles.eduSquircle}>
+                    {item.asset ? (
+                      <Image source={item.asset} style={styles.eduLogoInSquircle} resizeMode="contain" />
+                    ) : (
+                      <Ionicons
+                        name={item.icon}
+                        size={28}
+                        color={item.accentColor != null ? item.accentColor : GREEN.main}
                       />
                     )}
                   </View>
-                  <View style={styles.popMeta}>
-                    <View style={styles.popIcon}>
-                      <Ionicons name={item.icon} size={16} color={GREEN.dark} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.popTitle}>{item.title}</Text>
-                      <Text style={styles.popSub}>{item.sub}</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.eduTileTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.eduTileSub} numberOfLines={1}>
+                    {item.sub}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.paymentListTitle}>Others</Text>
+            <View style={styles.paymentListGrid}>
+              {OTHERS_LIST_ITEMS.map((item, index) => (
+                <TouchableOpacity
+                  key={item.key}
+                  activeOpacity={0.88}
+                  style={[
+                    styles.paymentListTile,
+                    ((index + 1) % 4 === 0 || index === OTHERS_LIST_ITEMS.length - 1) &&
+                      styles.paymentListTileRowEnd,
+                  ]}
+                  onPress={() => navigation.navigate(item.route)}
+                >
+                  <View style={[styles.paymentListSquircle, item.badge && styles.paymentListSquircleWithBadge]}>
+                    {item.badge ? (
+                      <View style={styles.tileCornerBadge} pointerEvents="none">
+                        <Text style={styles.tileCornerBadgeText} numberOfLines={1}>
+                          {item.badge}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <Ionicons name={item.icon} size={26} color={item.color} />
+                  </View>
+                  <Text style={styles.paymentListLabel} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.paymentListTitle}>Saving Goal</Text>
+            <Text style={styles.goalBodyText}>Don&apos;t withdraw for 30 days</Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: '60%' }]} />
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.paymentListTitle}>Rewards</Text>
+            <Text style={styles.rewardsBodyText}>You earned ৳100 bonus</Text>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Promo & Discount</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('EducationAll')}>
+                <Text style={styles.viewAll}>See more</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.promoHScroll}
+            >
+              <TouchableOpacity
+                activeOpacity={0.92}
+                style={[styles.promoCardTouch, { width: PROMO_CARD_SCROLL_W }]}
+                onPress={() => navigation.navigate('EducationAll')}
+              >
+                <LinearGradient
+                  colors={['#14532d', '#15803d', '#16a34a', '#22c55e']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.promoCard}
+                >
+                  <View style={styles.promoCardRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.promoTitle}>Special Offer For Today&apos;s Top Up</Text>
+                      <Text style={styles.promoSub}>Limited time rewards</Text>
+                      <Text style={styles.promoDesc} numberOfLines={2}>
+                        Get discount for every top up, transfer and payment.
+                      </Text>
+                    </View>
+                    <View style={styles.promoIcon}>
+                      <Ionicons name="gift-outline" size={20} color="rgba(255,255,255,0.95)" />
+                    </View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.92}
+                style={styles.promoPeekTouch}
+                onPress={() => navigation.navigate('EducationAll')}
+              >
+                <LinearGradient
+                  colors={['#0369a1', '#38bdf8', '#7dd3fc']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.promoCardPeek}
+                >
+                  <Text style={styles.promoPeekTitle}>Bonus</Text>
+                  <Text style={styles.promoPeekSub}>Next offer</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
 
           <View style={styles.section}>
@@ -348,9 +665,37 @@ export default function DashboardScreen({ navigation }) {
             </View>
           </View>
 
-          <View style={{ height: 92 }} />
+          <View style={{ height: 132 + Math.max(insets.bottom, 12) }} />
         </View>
       </ScrollView>
+
+      <View style={styles.floatingShortcutsLayer} pointerEvents="box-none">
+        <View
+          style={[styles.actionShortcutsSlotOverlay, { top: headerHeight - 32 }]}
+          pointerEvents="box-none"
+        >
+          <View style={styles.actionShortcutsCard}>
+            {[
+              { key: 'add', label: 'Add', type: 'topup', route: 'EducationAll' },
+              { key: 'use', label: 'Learn', type: 'send', route: 'QuizList' },
+              { key: 'withdraw', label: 'Withdraw', type: 'request', route: 'Results' },
+              { key: 'tx', label: 'History', type: 'history', route: 'EducationAll' },
+            ].map((it) => (
+              <TouchableOpacity
+                key={it.key}
+                style={styles.actionShortcut}
+                activeOpacity={0.95}
+                onPress={() => navigation.navigate(it.route)}
+              >
+                {renderShortcutIcon(it.type)}
+                <Text style={styles.actionLabel} numberOfLines={1}>
+                  {it.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
 
       <Modal
         visible={notificationsOpen}
@@ -433,31 +778,55 @@ export default function DashboardScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: GREEN.bg },
+  screen: { flex: 1, backgroundColor: GREEN.bg, overflow: 'visible' },
   top: {
-    height: 208,
-    backgroundColor: GREEN.dark,
+    minHeight: 252,
+    paddingBottom: 52,
     overflow: 'hidden',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    position: 'relative',
+    zIndex: 2,
+    ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
   },
-  topBgBubble: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(34,197,94,0.28)',
-    top: -120,
-    left: -90,
+  floatingShortcutsLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 18,
+    pointerEvents: 'box-none',
   },
-  topInner: { flex: 1, paddingHorizontal: 20 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center' },
+  topInner: { flex: 1, paddingHorizontal: 22, justifyContent: 'flex-start', paddingBottom: 6 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    minHeight: 48,
+  },
+  topRowLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    minWidth: 0,
+  },
+  topRowCenter: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    minWidth: 0,
+  },
+  topRowRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 0,
+  },
   iconBtn: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -467,9 +836,8 @@ const styles = StyleSheet.create({
   },
   notifBtn: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.38)',
     position: 'relative',
-    marginRight: 10,
   },
   notifBadge: {
     position: 'absolute',
@@ -485,61 +853,82 @@ const styles = StyleSheet.create({
   },
   notifBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   avatarBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.75)',
+    borderColor: 'rgba(255,255,255,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarImg: { width: '100%', height: '100%', resizeMode: 'cover', borderRadius: 22 },
+  avatarImg: { width: '100%', height: '100%', resizeMode: 'cover', borderRadius: 24 },
   avatarFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   avatarInitials: { color: '#ffffff', fontWeight: '900', fontSize: 14, letterSpacing: 0.4 },
-  topTitle: { marginTop: 10, fontSize: 20, fontWeight: '900', color: '#ffffff', maxWidth: 300 },
-  topSubtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-    color: 'rgba(234,255,240,0.9)',
-    maxWidth: 320,
+  topHadithLabel: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
-  pillRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-  pill: {
-    flex: 1,
-    height: 46,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+  hadithMarqueeBlock: { marginTop: 0, position: 'relative', alignSelf: 'stretch' },
+  hadithMeasureWrap: {
+    position: 'absolute',
+    opacity: 0,
+    left: 0,
+    top: 0,
+    zIndex: -1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    maxWidth: 8000,
+  },
+  hadithMarqueeClip: {
+    overflow: 'hidden',
+    minHeight: 26,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  hadithMarqueePlaceholder: { minHeight: 26 },
+  hadithMarqueeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
+  hadithMarqueeLineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    marginRight: 12,
+    flexWrap: 'nowrap',
+    flexShrink: 0,
+    flexGrow: 0,
   },
-  pillText: { flex: 1, color: '#eafff0', fontWeight: '800', marginLeft: 10, fontSize: 14 },
-  logoutMini: {
-    width: 44,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  hadithMarqueeBodySeg: { flexShrink: 0 },
+  hadithMarqueeSep: {
+    color: 'rgba(234,255,240,0.5)',
+    fontWeight: '600',
   },
-
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: 0, paddingTop: 0 },
+  hadithMarqueeRef: {
+    color: 'rgba(255,251,235,0.98)',
+    fontWeight: '800',
+  },
+  hadithMarqueeText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: 'rgba(234,255,240,0.95)',
+  },
+  scroll: { flex: 1, zIndex: 1, marginTop: -40 },
+  content: { paddingHorizontal: 0, paddingTop: 0, flexGrow: 1 },
+  actionShortcutsSlotOverlay: {
+    position: 'absolute',
+    left: SHEET_PAD_X,
+    right: SHEET_PAD_X,
+    zIndex: 20,
+  },
   sheet: {
-    marginTop: -18,
+    marginTop: -6,
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 22,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingTop: 84,
     paddingHorizontal: 20,
     minHeight: 600,
     // subtle top edge shadow + clean rounded cut
@@ -550,15 +939,73 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   section: { marginBottom: 26 },
+  /** Clears the floating shortcut card; keeps Payment List visually below it. */
+  paymentSection: {
+    paddingTop: 24,
+    marginTop: 18,
+  },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: GREEN.dark },
-  viewAll: { fontSize: 14, fontWeight: '800', color: GREEN.main },
-  eduWrap: {
-    borderRadius: 22,
-    overflow: 'hidden',
-    backgroundColor: '#ffffff',
+  viewAll: { fontSize: 14, fontWeight: '800', color: HEADER.accent },
+  balanceInHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    paddingBottom: 28,
+    minHeight: 108,
+    flexShrink: 0,
   },
-  eduHead: { paddingHorizontal: 2, paddingTop: 2, marginBottom: 8 },
+  availableBalanceLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.88)',
+    letterSpacing: 0.5,
+  },
+  walletSubLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+    letterSpacing: 0.3,
+  },
+  balanceStatsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingHorizontal: 8,
+  },
+  balanceStatText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.92)',
+    marginHorizontal: 3,
+  },
+  balanceStatDivider: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.45)',
+    marginHorizontal: 2,
+  },
+  streakHint: {
+    marginTop: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.88)',
+    textAlign: 'center',
+  },
+  availableBalanceAmount: {
+    marginTop: 8,
+    fontSize: 38,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.8,
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+    ...(Platform.OS === 'ios' ? { fontVariant: ['tabular-nums'] } : {}),
+  },
   dealCard: {
     borderRadius: 18,
     backgroundColor: '#ffffff',
@@ -586,7 +1033,298 @@ const styles = StyleSheet.create({
   dealSub: { fontSize: 12, fontWeight: '700', color: '#16a34a', marginTop: 2 },
 
   popGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  eduScroll: { paddingTop: 6, paddingBottom: 2, paddingRight: 8 },
+  eduGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  eduTile: {
+    width: EDU_TILE_W,
+    marginRight: EDU_GRID_GAP,
+    marginBottom: EDU_GRID_GAP,
+    alignItems: 'center',
+  },
+  eduTileRowEnd: {
+    marginRight: 0,
+  },
+  eduSquircle: {
+    width: EDU_SQUIRCLE,
+    height: EDU_SQUIRCLE,
+    borderRadius: 22,
+    backgroundColor: '#eef5f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eduLogoInSquircle: {
+    width: Math.round(EDU_SQUIRCLE * 0.58),
+    height: Math.round(EDU_SQUIRCLE * 0.58),
+    maxWidth: 52,
+    maxHeight: 52,
+  },
+  eduTileTitle: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    width: '100%',
+  },
+  eduTileSub: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    textAlign: 'center',
+    width: '100%',
+  },
+  paymentListTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0a0a0f',
+    letterSpacing: -0.5,
+    lineHeight: 26,
+    marginBottom: 16,
+  },
+  paymentListGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  paymentListTile: {
+    width: PAYMENT_TILE_W,
+    marginRight: PAYMENT_GRID_GAP,
+    marginBottom: PAYMENT_GRID_GAP,
+    alignItems: 'center',
+  },
+  paymentListTileRowEnd: {
+    marginRight: 0,
+  },
+  paymentListSquircle: {
+    width: PAYMENT_TILE_W - 2,
+    height: PAYMENT_TILE_W - 2,
+    maxWidth: 72,
+    maxHeight: 72,
+    borderRadius: 22,
+    backgroundColor: '#eef5f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentListSquircleWithBadge: {
+    position: 'relative',
+  },
+  tileCornerBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 2,
+    zIndex: 1,
+    backgroundColor: GREEN.main,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 5,
+    maxWidth: 52,
+  },
+  tileCornerBadgeText: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.2,
+    textAlign: 'center',
+  },
+  paymentListLabel: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f172a',
+    textAlign: 'center',
+    width: '100%',
+    lineHeight: 15,
+  },
+  actionShortcutsCard: {
+    marginTop: 0,
+    marginBottom: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.18)',
+    shadowColor: '#14532d',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    ...(Platform.OS === 'android' ? { elevation: 14 } : {}),
+  },
+  actionShortcut: {
+    width: '23%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  actionGlowPlate: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: HEADER.iconPlate,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walletIconWrap: {
+    position: 'relative',
+    width: 34,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walletPlusBadge: {
+    position: 'absolute',
+    left: -3,
+    bottom: -3,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: HEADER.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  dollarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: HEADER.iconBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    backgroundColor: 'transparent',
+  },
+  dollarCircleChar: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: HEADER.dark,
+    marginTop: -1,
+  },
+  dollarCircleArrowSend: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    transform: [{ rotate: '45deg' }],
+  },
+  dollarCircleArrowReq: {
+    position: 'absolute',
+    bottom: 2,
+    left: 2,
+    transform: [{ rotate: '-45deg' }],
+  },
+  historyTenWrap: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  historyTenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyTenCenter: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: HEADER.dark,
+    marginTop: 1,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
+  },
+  actionLabel: {
+    marginTop: 5,
+    fontSize: 9,
+    fontWeight: '800',
+    color: HEADER.label,
+    letterSpacing: -0.15,
+    textAlign: 'center',
+  },
+  goalBodyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 10,
+    marginTop: -6,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e2e8f0',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: GREEN.main,
+  },
+  rewardsBodyText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginTop: -6,
+  },
+  promoHScroll: { flexDirection: 'row', alignItems: 'stretch', gap: 12, paddingRight: 4 },
+  promoCardTouch: {},
+  promoPeekTouch: { width: 112, borderRadius: 22, overflow: 'hidden' },
+  promoCardPeek: {
+    flex: 1,
+    borderRadius: 22,
+    padding: 16,
+    justifyContent: 'flex-end',
+    minHeight: 132,
+  },
+  promoPeekTitle: { fontSize: 16, fontWeight: '900', color: 'rgba(255,255,255,0.98)' },
+  promoPeekSub: { marginTop: 4, fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  promoCard: {
+    width: '100%',
+    borderRadius: 22,
+    overflow: 'hidden',
+    padding: 18,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  promoCardRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  promoTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.98)',
+    letterSpacing: -0.2,
+  },
+  promoSub: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.92)',
+  },
+  promoDesc: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 17,
+  },
+  promoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
   popCard: {
     width: '48%',
     borderRadius: 18,
@@ -602,25 +1340,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   popImgAsset: { width: 120, height: 80 },
-  eduCardH: {
-    width: EDU_CARD_WIDTH,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dcfce7',
-    overflow: 'hidden',
-    marginRight: 12,
-  },
-  eduImgH: {
-    height: 120,
-    backgroundColor: GREEN.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eduImgLogo: {
-    width: 120,
-    height: 80,
-  },
   popMeta: { flexDirection: 'row', alignItems: 'center', padding: 12 },
   popIcon: {
     width: 32,

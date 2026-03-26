@@ -17,6 +17,10 @@ import QuizListScreen from '../screens/QuizListScreen';
 import QuizPrepScreen from '../screens/QuizPrepScreen';
 import QuizPlayScreen from '../screens/QuizPlayScreen';
 import QuizLeaderboardScreen from '../screens/QuizLeaderboardScreen';
+import EducationAllScreen from '../screens/EducationAllScreen';
+import ScanScreen from '../screens/ScanScreen';
+import BloodDonationScreen from '../screens/BloodDonationScreen';
+
 const Stack = createNativeStackNavigator();
 
 function BootScreen() {
@@ -65,6 +69,9 @@ export default function AppNavigator() {
           <Stack.Screen name="QuizPrep" component={QuizPrepScreen} />
           <Stack.Screen name="QuizPlay" component={QuizPlayScreen} />
           <Stack.Screen name="QuizLeaderboard" component={QuizLeaderboardScreen} />
+          <Stack.Screen name="EducationAll" component={EducationAllScreen} />
+          <Stack.Screen name="Scan" component={ScanScreen} />
+          <Stack.Screen name="BloodDonation" component={BloodDonationScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>

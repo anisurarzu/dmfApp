@@ -79,6 +79,18 @@ export default function MenuScreen({ navigation }) {
           <MenuRow icon="settings-outline" label="Settings" sub="App preferences" onPress={() => {}} />
           <MenuRow icon="school-outline" label="Scholarship" sub="Programs & applications" onPress={() => {}} />
           <MenuRow icon="heart-outline" label="Donation" sub="Give & support" onPress={() => {}} />
+          <MenuRow
+            icon="water-outline"
+            label="Blood donation"
+            sub="Donor compatibility guide"
+            onPress={() => navigation.navigate('BloodDonation')}
+          />
+          <MenuRow
+            icon="scan-outline"
+            label="Scan QR"
+            sub="QR codes & barcodes"
+            onPress={() => navigation.navigate('Scan')}
+          />
 
           <View style={{ height: 18 }} />
           <Text style={styles.sectionLabel}>Support</Text>
@@ -98,7 +110,7 @@ export default function MenuScreen({ navigation }) {
           <View style={{ height: 92 }} />
         </View>
       </ScrollView>
-      <BottomNav navigation={navigation} />
+      <BottomNav navigation={navigation} active="menu" />
     </View>
   );
 }

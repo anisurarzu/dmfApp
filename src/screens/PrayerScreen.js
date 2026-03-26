@@ -3,8 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import BottomNav from '../components/BottomNav';
+
+function isAladhanOk(code) {
+  return Number(code) === 200;
+}
 
 const CALC_METHOD = 4; // Umm al-Qura (Salafi-friendly, same as many apps)
 
@@ -42,7 +47,7 @@ function getPrayerSchedule(date, timings) {
   const isha = buildTime(date, stripOffset(timings?.Isha));
 
   const rows = [
-    { key: 'Fajr', label: 'Fajr', icon: 'cloudy-night-outline', start: fajr },
+    { key: 'Fajr', label: 'Fajr', icon: 'moon-outline', start: fajr },
     { key: 'Dhuhr', label: 'Dhuhr', icon: 'sunny-outline', start: dhuhr },
     { key: 'Asr', label: 'Asr', icon: 'partly-sunny-outline', start: asr },
     { key: 'Maghrib', label: 'Maghrib', icon: 'moon-outline', start: maghrib },
@@ -66,6 +71,7 @@ function getPrayerSchedule(date, timings) {
 }
 
 export default function PrayerScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [coords, setCoords] = useState(null);
@@ -139,10 +145,10 @@ export default function PrayerScreen({ navigation }) {
         const [resToday, resTomorrow] = await Promise.all([fetch(urlToday), fetch(urlTomorrow)]);
         const jsonToday = await resToday.json();
         const jsonTomorrow = await resTomorrow.json();
-        if (jsonToday.code !== 200) {
+        if (!isAladhanOk(jsonToday.code)) {
           throw new Error(jsonToday.data?.message || 'Failed to fetch today timings');
         }
-        if (jsonTomorrow.code !== 200) {
+        if (!isAladhanOk(jsonTomorrow.code)) {
           throw new Error(jsonTomorrow.data?.message || 'Failed to fetch tomorrow timings');
         }
         setTimingsToday(jsonToday.data.timings);
@@ -168,6 +174,12 @@ export default function PrayerScreen({ navigation }) {
   const schedule = useMemo(() => getPrayerSchedule(now, timingsToday), [now, timingsToday]);
   const current = useMemo(() => {
     if (!schedule.length) return null;
+    const firstStart = schedule[0].start;
+    /** After midnight but before today's Fajr — still Isha / night period */
+    if (firstStart && now < firstStart) {
+      const isha = schedule.find((r) => r.key === 'Isha');
+      return isha || schedule[schedule.length - 1];
+    }
     for (let i = schedule.length - 1; i >= 0; i--) {
       if (now >= schedule[i].start) return schedule[i];
     }
@@ -180,16 +192,20 @@ export default function PrayerScreen({ navigation }) {
     // For Fajr/Dhuhr/Asr/Maghrib we already set .end inside getPrayerSchedule
     if (current.end) return current.end;
 
-    // Special case: Isha ends at next day's Fajr (Salafi-friendly)
+    // Isha ends at next Fajr; before today's Fajr we're still in night Isha → end = today's Fajr
     if (current.key === 'Isha') {
-      // Prefer tomorrow's Fajr from API; fallback to today's Fajr + 1 day
+      const fajrStr = stripOffset(timingsToday?.Fajr);
+      const fajrToday = fajrStr ? buildTime(now, fajrStr) : null;
+      if (fajrToday && now < fajrToday) {
+        return fajrToday;
+      }
       const baseFajr =
         stripOffset(timingsTomorrow?.Fajr) || stripOffset(timingsToday?.Fajr);
       if (baseFajr) {
         const tomorrow = new Date(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const fajrTomorrow = buildTime(tomorrow, baseFajr);
-        if (fajrTomorrow) return fajrTomorrow;
+        const fajrNext = buildTime(tomorrow, baseFajr);
+        if (fajrNext) return fajrNext;
       }
     }
 
@@ -232,7 +248,7 @@ export default function PrayerScreen({ navigation }) {
     <View style={styles.screen}>
       <StatusBar style="light" />
 
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top, minHeight: 360 + insets.top }]}>
         <View style={styles.heroSky} />
         <View style={styles.sun} />
         <View style={styles.hillBack} />
@@ -278,7 +294,11 @@ export default function PrayerScreen({ navigation }) {
         </View>
       </View>
 
-      <ScrollView style={styles.sheet} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.sheet}
+        contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.sheetCard}>
           <View style={styles.sheetIconRow}>
             <View style={styles.sheetIconCircle}>
@@ -457,7 +477,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#e5f5ec' },
 
   hero: {
-    height: 360,
+    minHeight: 360,
     backgroundColor: '#bbf7d0',
     overflow: 'hidden',
   },

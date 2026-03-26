@@ -239,7 +239,7 @@ export default function ResultScreen({ navigation }) {
         })()}
         <View style={{ height: 18 }} />
       </View>
-      <BottomNav navigation={navigation} active="results" />
+      <BottomNav navigation={navigation} active="home" />
     </View>
   );
 }

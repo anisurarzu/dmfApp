@@ -50,7 +50,7 @@ export default function DuaScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      <BottomNav navigation={navigation} active="dua" />
+      <BottomNav navigation={navigation} active="home" />
     </View>
   );
 }

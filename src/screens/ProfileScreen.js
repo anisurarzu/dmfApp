@@ -1,9 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { uploadToImgbb } from '../api/imgbb';
+import { assertProfilePickSizeOk, prepareProfileImageForUpload } from '../utils/profileImagePrep';
 import BottomNav from '../components/BottomNav';
 
 function getAvatarUri(me) {
@@ -39,9 +43,14 @@ function getInitials(me) {
   );
 }
 
-function Row({ icon, title, subtitle, onPress }) {
+function Row({ icon, title, subtitle, onPress, disabled }) {
   return (
-    <TouchableOpacity style={styles.row} activeOpacity={0.75} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.row, disabled && { opacity: 0.55 }]}
+      activeOpacity={0.75}
+      onPress={onPress}
+      disabled={disabled}
+    >
       <View style={styles.rowIcon}>
         <Ionicons name={icon} size={18} color={GREEN.dark} />
       </View>
@@ -54,15 +63,99 @@ function Row({ icon, title, subtitle, onPress }) {
   );
 }
 
+function buildProfileUpdatePayload(me, imageUrl) {
+  const email = me?.email ? String(me.email).trim().toLowerCase() : '';
+  return {
+    email,
+    firstName: (me?.firstName || '').trim(),
+    lastName: (me?.lastName || '').trim(),
+    username: (me?.username || '').trim(),
+    phone: (me?.phone || '').trim(),
+    profession: (me?.profession || '').trim(),
+    currentAddress: (me?.currentAddress || '').trim(),
+    permanentAddress: (me?.permanentAddress || '').trim(),
+    image: (imageUrl || '').trim(),
+  };
+}
+
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { me, logout, isBusy } = useAuth();
+  const { me, isBusy, updateProfile } = useAuth();
+  const [isCameraUploading, setIsCameraUploading] = useState(false);
   const avatarUri = getAvatarUri(me);
   const initials = getInitials(me);
 
   const fullName = `${me?.firstName || ''} ${me?.lastName || ''}`.trim() || me?.username || 'User';
   const email = me?.email || '';
   const username = me?.username ? `@${me.username}` : '';
+
+  const takePhotoAndUpload = async (cameraType) => {
+    if (!me?.email) {
+      Alert.alert('Profile photo', 'Your account email is missing. Please sign in again.');
+      return;
+    }
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.status !== 'granted') {
+      Alert.alert('Camera', 'Please allow camera access to take a photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.72,
+      cameraType,
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    const uri = asset?.uri;
+    if (!uri) {
+      Alert.alert('Profile photo', 'Could not read the photo. Try again.');
+      return;
+    }
+
+    setIsCameraUploading(true);
+    try {
+      assertProfilePickSizeOk(asset?.fileSize);
+      const preparedUri = await prepareProfileImageForUpload(uri, {
+        width: asset?.width,
+        height: asset?.height,
+      });
+      const { url } = await uploadToImgbb({ uri: preparedUri, mimeType: 'image/jpeg' });
+      const payload = buildProfileUpdatePayload(me, url);
+      if (!payload.email) {
+        Alert.alert('Profile photo', 'Your account email is missing.');
+        return;
+      }
+      const res = await updateProfile(payload);
+      if (!res.ok) {
+        Alert.alert('Upload failed', res.error || 'Could not update profile photo.');
+        return;
+      }
+      Alert.alert('Done', 'Profile photo updated.');
+    } catch (e) {
+      Alert.alert('Upload failed', e?.message || 'Something went wrong.');
+    } finally {
+      setIsCameraUploading(false);
+    }
+  };
+
+  const openCameraOptions = () => {
+    if (isBusy || isCameraUploading) return;
+    Alert.alert('Take photo', 'Choose which camera to use', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Back camera',
+        onPress: () => takePhotoAndUpload(ImagePicker.CameraType.back),
+      },
+      {
+        text: 'Front camera',
+        onPress: () => takePhotoAndUpload(ImagePicker.CameraType.front),
+      },
+    ]);
+  };
 
   return (
     <View style={styles.screen}>
@@ -82,15 +175,30 @@ export default function ProfileScreen({ navigation }) {
           </View>
 
           <View style={styles.profileCard}>
-            <View style={styles.avatarWrap}>
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
-              ) : (
-                <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarInitials}>{initials}</Text>
-                </View>
-              )}
-            </View>
+            <TouchableOpacity
+              style={styles.avatarTouch}
+              onPress={openCameraOptions}
+              activeOpacity={0.85}
+              disabled={isBusy || isCameraUploading}
+              accessibilityLabel="Take profile photo with camera"
+            >
+              <View style={styles.avatarWrap}>
+                {isCameraUploading ? (
+                  <View style={styles.avatarFallback}>
+                    <ActivityIndicator color="#fff" />
+                  </View>
+                ) : avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarInitials}>{initials}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.avatarCamBadge}>
+                <Ionicons name="camera" size={14} color={GREEN.dark} />
+              </View>
+            </TouchableOpacity>
 
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{fullName}</Text>
@@ -104,6 +212,13 @@ export default function ProfileScreen({ navigation }) {
       <View style={styles.sheet}>
         <Text style={styles.sectionLabel}>Profile</Text>
         <Row icon="person-outline" title="Edit profile" subtitle="Name, photo, contact" onPress={() => navigation.navigate('EditProfile')} />
+        <Row
+          icon="camera-outline"
+          title="Take photo & upload"
+          subtitle="Back or front camera · updates profile picture"
+          onPress={openCameraOptions}
+          disabled={isBusy || isCameraUploading}
+        />
         <Row icon="key-outline" title="Change password" subtitle="Update your password" onPress={() => navigation.navigate('ChangePassword')} />
         <Row icon="shield-checkmark-outline" title="Security" subtitle="Login sessions" onPress={() => {}} />
         <View style={{ height: 92 }} />
@@ -147,6 +262,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarTouch: {
+    marginRight: 14,
+    position: 'relative',
+  },
   avatarWrap: {
     width: 64,
     height: 64,
@@ -155,7 +274,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.75)',
-    marginRight: 14,
+  },
+  avatarCamBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.9)',
   },
   avatarImg: { width: '100%', height: '100%', resizeMode: 'cover', borderRadius: 32 },
   avatarFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },

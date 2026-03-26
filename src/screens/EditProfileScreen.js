@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { GREEN, NEUTRAL } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { uploadToImgbb } from '../api/imgbb';
+import { assertProfilePickSizeOk, prepareProfileImageForUpload } from '../utils/profileImagePrep';
 import BottomNav from '../components/BottomNav';
 
 function Field({ label, value, onChangeText, placeholder, keyboardType, onFocus, editable = true }) {
@@ -76,7 +77,7 @@ export default function EditProfileScreen({ navigation }) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.9,
+      quality: 0.72,
     });
 
     if (result.canceled) return;
@@ -90,7 +91,12 @@ export default function EditProfileScreen({ navigation }) {
 
     setIsUploadingImage(true);
     try {
-      const { url } = await uploadToImgbb({ uri });
+      assertProfilePickSizeOk(asset?.fileSize);
+      const preparedUri = await prepareProfileImageForUpload(uri, {
+        width: asset?.width,
+        height: asset?.height,
+      });
+      const { url } = await uploadToImgbb({ uri: preparedUri, mimeType: 'image/jpeg' });
       setImage(url);
       setSuccess('Photo uploaded.');
     } catch (e) {
@@ -239,13 +245,6 @@ export default function EditProfileScreen({ navigation }) {
             value={permanentAddress}
             onChangeText={setPermanentAddress}
             placeholder="Permanent address"
-            onFocus={scrollToFocusedInput}
-          />
-          <Field
-            label="Profile image URL"
-            value={image}
-            onChangeText={setImage}
-            placeholder="https://..."
             onFocus={scrollToFocusedInput}
           />
 
