@@ -9,6 +9,7 @@ function openEducationItem(navigation, key) {
   if (key === 'result') navigation.navigate('Results');
   else if (key === 'quiz') navigation.navigate('QuizList');
   else if (key === 'blood_donation') navigation.navigate('BloodDonation');
+  else if (key === 'courses') navigation.navigate('CoursesList');
   else navigation.navigate('Menu');
 }
 

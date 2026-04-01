@@ -78,8 +78,8 @@ const EDU_SQUIRCLE = Math.min(EDU_TILE_W - 4, 84);
 const PROMO_CARD_SCROLL_W = SCREEN_WIDTH - SHEET_PAD_X * 2 - 36;
 
 const PAYMENT_LIST_ITEMS = [
-  { key: 'courses', label: 'Courses', icon: 'school-outline', color: '#15803d', route: 'EducationAll' },
-  { key: 'books', label: 'Books', icon: 'book-outline', color: '#ca8a04', route: 'EducationAll' },
+  { key: 'courses', label: 'Courses', icon: 'school-outline', color: '#15803d', route: 'CoursesList' },
+  { key: 'books', label: 'Books', icon: 'book-outline', color: '#ca8a04', route: 'BooksList' },
   { key: 'skills', label: 'Skills', icon: 'ribbon-outline', color: '#db2777', route: 'EducationAll' },
   { key: 'exam', label: 'Exam Fee', icon: 'document-text-outline', color: '#1d4ed8', route: 'EducationAll' },
   { key: 'training', label: 'Training', icon: 'fitness-outline', color: '#0369a1', route: 'EducationAll' },
@@ -120,7 +120,7 @@ function educationItemRoute(key) {
     case 'result':
       return 'Results';
     case 'courses':
-      return 'Menu';
+      return 'CoursesList';
     case 'blood_donation':
       return 'BloodDonation';
     default:

@@ -20,6 +20,11 @@ import QuizLeaderboardScreen from '../screens/QuizLeaderboardScreen';
 import EducationAllScreen from '../screens/EducationAllScreen';
 import ScanScreen from '../screens/ScanScreen';
 import BloodDonationScreen from '../screens/BloodDonationScreen';
+import CoursesListScreen from '../screens/CoursesListScreen';
+import CourseDetailScreen from '../screens/CourseDetailScreen';
+import BooksListScreen from '../screens/BooksListScreen';
+import BookReaderScreen from '../screens/BookReaderScreen';
+import BookDetailScreen from '../screens/BookDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -72,6 +77,11 @@ export default function AppNavigator() {
           <Stack.Screen name="EducationAll" component={EducationAllScreen} />
           <Stack.Screen name="Scan" component={ScanScreen} />
           <Stack.Screen name="BloodDonation" component={BloodDonationScreen} />
+          <Stack.Screen name="CoursesList" component={CoursesListScreen} />
+          <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
+          <Stack.Screen name="BooksList" component={BooksListScreen} />
+          <Stack.Screen name="BookDetail" component={BookDetailScreen} />
+          <Stack.Screen name="BookReader" component={BookReaderScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
