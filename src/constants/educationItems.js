@@ -5,7 +5,7 @@ export const EDUCATION_ITEMS = [
     title: 'Practice',
     sub: 'QUIZ',
     icon: 'help-circle',
-    asset: require('../../assets/quize-icon.png'),
+    asset: require('../../assets/learning.png'),
   },
   {
     key: 'courses',

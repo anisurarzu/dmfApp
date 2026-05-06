@@ -80,37 +80,12 @@ const PROMO_CARD_SCROLL_W = SCREEN_WIDTH - SHEET_PAD_X * 2 - 36;
 const PAYMENT_LIST_ITEMS = [
   { key: 'courses', label: 'Courses', icon: 'school-outline', color: '#15803d', route: 'CoursesList' },
   { key: 'books', label: 'Books', icon: 'book-outline', color: '#ca8a04', route: 'BooksList' },
-  { key: 'skills', label: 'Skills', icon: 'ribbon-outline', color: '#db2777', route: 'EducationAll' },
-  { key: 'exam', label: 'Exam Fee', icon: 'document-text-outline', color: '#1d4ed8', route: 'EducationAll' },
+  { key: 'skills', label: 'Skills', icon: 'ribbon-outline', color: '#db2777', route: 'Skills' },
+  { key: 'exam', label: 'Application', icon: 'document-text-outline', color: '#1d4ed8', route: 'Application' },
   { key: 'training', label: 'Training', icon: 'fitness-outline', color: '#0369a1', route: 'EducationAll' },
-  { key: 'rewards', label: 'Rewards Shop', icon: 'gift-outline', color: GREEN.main, route: 'EducationAll' },
-  { key: 'goalsaving', label: 'Goal Saving', icon: 'flag-outline', color: '#0d9488', route: 'EducationAll' },
-  { key: 'career', label: 'Career', icon: 'briefcase-outline', color: '#64748b', route: 'EducationAll' },
-];
-
-const OTHERS_LIST_ITEMS = [
-  {
-    key: 'gift_voucher',
-    label: 'Gift Voucher',
-    icon: 'gift-outline',
-    color: '#db2777',
-    route: 'EducationAll',
-    badge: 'Popular',
-  },
-  {
-    key: 'shop_voucher',
-    label: 'Shop Voucher',
-    icon: 'bag-handle-outline',
-    color: '#ca8a04',
-    route: 'EducationAll',
-    badge: 'New',
-  },
-  { key: 'donate', label: 'Donate', icon: 'heart-outline', color: '#ef4444', route: 'EducationAll' },
-  { key: 'blood_donate', label: 'Blood Donate', icon: 'water-outline', color: '#dc2626', route: 'BloodDonation' },
-  { key: 'career_other', label: 'Career', icon: 'briefcase-outline', color: '#64748b', route: 'EducationAll' },
+  { key: 'support', label: 'Support', icon: 'chatbubbles-outline', color: GREEN.main, route: 'SupportChat' },
   { key: 'student_loan', label: 'Student Loan', icon: 'cash-outline', color: '#15803d', route: 'EducationAll' },
-  { key: 'scholarship_info', label: 'Scholarship Info', icon: 'document-text-outline', color: '#1d4ed8', route: 'EducationAll' },
-  { key: 'support', label: 'Support', icon: 'chatbubbles-outline', color: GREEN.main, route: 'Menu' },
+  { key: 'career', label: 'Career', icon: 'briefcase-outline', color: '#64748b', route: 'Career' },
 ];
 
 function educationItemRoute(key) {
@@ -460,19 +435,18 @@ export default function DashboardScreen({ navigation }) {
           </View>
 
           <View style={styles.balanceInHeader}>
-            <Text style={styles.availableBalanceLabel}>Scholarship Wallet</Text>
-            <Text style={styles.walletSubLabel}>Your Learning Fund</Text>
+            <Text style={styles.availableBalanceLabel}>DMF Wallet</Text>
+            <Text style={styles.walletSubLabel}>DMF CREDITS</Text>
             <Text style={styles.availableBalanceAmount} numberOfLines={1}>
-              ৳137,946
+              137,946 Credits
             </Text>
             <View style={styles.balanceStatsRow}>
-              <Text style={styles.balanceStatText}>Saved: ৳12,400</Text>
+              <Text style={styles.balanceStatText}>Saved: 12,400 Credits</Text>
               <Text style={styles.balanceStatDivider}>·</Text>
-              <Text style={styles.balanceStatText}>Bonus: ৳800</Text>
+              <Text style={[styles.balanceStatText, styles.balanceStatBonusText]}>Bonus: 800 Credits</Text>
               <Text style={styles.balanceStatDivider}>·</Text>
-              <Text style={styles.balanceStatText}>Locked: ৳5,000</Text>
+              <Text style={styles.balanceStatText}>Locked: 5,000 Credits</Text>
             </View>
-            <Text style={styles.streakHint}>🔥 Streak: 5 days no withdraw</Text>
           </View>
         </View>
       </LinearGradient>
@@ -511,7 +485,7 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.section}>
             <Text style={styles.paymentListTitle}>Education</Text>
             <View style={styles.eduGrid}>
-              {EDUCATION_ITEMS.map((item, index) => (
+              {EDUCATION_ITEMS.filter((it) => it.key !== 'courses').map((item, index) => (
                 <TouchableOpacity
                   key={item.key}
                   activeOpacity={0.88}
@@ -541,48 +515,8 @@ export default function DashboardScreen({ navigation }) {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.paymentListTitle}>Others</Text>
-            <View style={styles.paymentListGrid}>
-              {OTHERS_LIST_ITEMS.map((item, index) => (
-                <TouchableOpacity
-                  key={item.key}
-                  activeOpacity={0.88}
-                  style={[
-                    styles.paymentListTile,
-                    ((index + 1) % 4 === 0 || index === OTHERS_LIST_ITEMS.length - 1) &&
-                      styles.paymentListTileRowEnd,
-                  ]}
-                  onPress={() => navigation.navigate(item.route)}
-                >
-                  <View style={[styles.paymentListSquircle, item.badge && styles.paymentListSquircleWithBadge]}>
-                    {item.badge ? (
-                      <View style={styles.tileCornerBadge} pointerEvents="none">
-                        <Text style={styles.tileCornerBadgeText} numberOfLines={1}>
-                          {item.badge}
-                        </Text>
-                      </View>
-                    ) : null}
-                    <Ionicons name={item.icon} size={26} color={item.color} />
-                  </View>
-                  <Text style={styles.paymentListLabel} numberOfLines={2}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.paymentListTitle}>Saving Goal</Text>
-            <Text style={styles.goalBodyText}>Don&apos;t withdraw for 30 days</Text>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: '60%' }]} />
-            </View>
-          </View>
-
-          <View style={styles.section}>
             <Text style={styles.paymentListTitle}>Rewards</Text>
-            <Text style={styles.rewardsBodyText}>You earned ৳100 bonus</Text>
+            <Text style={styles.rewardsBodyText}>You earned 100 Credits bonus</Text>
           </View>
 
           <View style={styles.section}>
@@ -950,14 +884,14 @@ const styles = StyleSheet.create({
   balanceInHeader: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 28,
     minHeight: 108,
     flexShrink: 0,
   },
   availableBalanceLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
     color: 'rgba(255,255,255,0.88)',
     letterSpacing: 0.5,
   },
@@ -973,20 +907,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 3,
     paddingHorizontal: 8,
   },
   balanceStatText: {
     fontSize: 11,
     fontWeight: '700',
     color: 'rgba(255,255,255,0.92)',
-    marginHorizontal: 3,
+    marginHorizontal: 6,
+  },
+  balanceStatBonusText: {
+    marginLeft: 10,
   },
   balanceStatDivider: {
     fontSize: 11,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.45)',
-    marginHorizontal: 2,
+    marginHorizontal: 4,
   },
   streakHint: {
     marginTop: 8,
@@ -1138,12 +1075,12 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   actionShortcutsCard: {
-    marginTop: 0,
+    marginTop: 10,
     marginBottom: 0,
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1459,4 +1396,3 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 });
-

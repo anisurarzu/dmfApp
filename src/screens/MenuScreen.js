@@ -94,7 +94,12 @@ export default function MenuScreen({ navigation }) {
 
           <View style={{ height: 18 }} />
           <Text style={styles.sectionLabel}>Support</Text>
-          <MenuRow icon="help-circle-outline" label="Help & Support" sub="Get help" onPress={() => {}} />
+          <MenuRow
+            icon="help-circle-outline"
+            label="Help & Support"
+            sub="AI + live customer service"
+            onPress={() => navigation.navigate('SupportChat')}
+          />
 
           <View style={{ height: 22 }} />
           <TouchableOpacity

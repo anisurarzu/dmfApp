@@ -22,7 +22,7 @@ import {
 } from '../api/quiz';
 import BottomNav from '../components/BottomNav';
 
-const QUIZ_ICON = require('../../assets/quize-icon.png');
+const QUIZ_ICON = require('../../assets/learning.png');
 
 export default function QuizListScreen({ navigation }) {
   const insets = useSafeAreaInsets();

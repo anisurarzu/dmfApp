@@ -25,6 +25,10 @@ import CourseDetailScreen from '../screens/CourseDetailScreen';
 import BooksListScreen from '../screens/BooksListScreen';
 import BookReaderScreen from '../screens/BookReaderScreen';
 import BookDetailScreen from '../screens/BookDetailScreen';
+import CareerScreen from '../screens/CareerScreen';
+import SupportChatScreen from '../screens/SupportChatScreen';
+import SkillsScreen from '../screens/SkillsScreen';
+import ApplicationScreen from '../screens/ApplicationScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -82,6 +86,10 @@ export default function AppNavigator() {
           <Stack.Screen name="BooksList" component={BooksListScreen} />
           <Stack.Screen name="BookDetail" component={BookDetailScreen} />
           <Stack.Screen name="BookReader" component={BookReaderScreen} />
+          <Stack.Screen name="Career" component={CareerScreen} />
+          <Stack.Screen name="SupportChat" component={SupportChatScreen} />
+          <Stack.Screen name="Skills" component={SkillsScreen} />
+          <Stack.Screen name="Application" component={ApplicationScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -92,4 +100,3 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
-
